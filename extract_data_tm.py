@@ -101,6 +101,25 @@ alt_end = altitude[len(altitude)-nb_gnss_point_touchdown:len(altitude)]
 # time_end = np.array(tm_time)[gnss_valid]
 time_end = tm_time[len(tm_time)-nb_gnss_point_touchdown:len(tm_time)]
 
+angle_baro = []
+angle_baro.append(0)
+
+alt_pitot_baro = []
+alt_pitot_baro.append(0)
+
+for i in range (1, len(altitude_baro), 1):
+
+    if (tm_time[i] > 5000) :
+        angle = math.tan((altitude_baro[i] - altitude_baro[i-1]) / (tm_time[i] - tm_time[i-1])) * 360
+        angle_baro.append(angle)
+    else :
+        angle_baro.append(85)
+
+    alt = math.sin(math.radians(angle_baro[i])) * speed_pitot[i] * (tm_time[i] - tm_time[i-1]) / 1000
+    alt_pitot_baro.append(alt + alt_pitot_baro[i-1])
+
+    print(alt_pitot_baro[i], altitude_baro[i])
+
 # CubicSpline extrapolation 
 spline_lon = CubicSpline(time_end, lon_end, extrapolate=True)
 spline_lat = CubicSpline(time_end, lat_end, extrapolate=True)
@@ -170,8 +189,10 @@ plt.tight_layout()
 fig_1 = plt.figure(figsize=(12, 12))
 
 ax1 = plt.subplot(2, 1, 1)
-ax1.plot(tm_time, list(map(lambda x, y: x-altitude[0] if y == 1 else 0, altitude, gnss_valid)), label='GNSS "valid" altitude (relative to surface)')
+#ax1.plot(tm_time, list(map(lambda x, y: x-altitude[0] if y == 1 else 0, altitude, gnss_valid)), label='GNSS "valid" altitude (relative to surface)')
 ax1.plot(tm_time, altitude_baro, label='Barometer altitude (relative to surface)')
+#ax1.plot(tm_time, angle_baro, label='Barometer angle')
+ax1.plot(tm_time, alt_pitot_baro, label='Alt (speed from Pitot and angle from Baro')
 ax1.scatter(tm_time[max_alt_ind], altitude_baro[max_alt_ind], marker='+', s=200)
 ax1.text(tm_time[max_alt_ind], altitude_baro[max_alt_ind], f'Max alt: {altitude_baro[max_alt_ind]:.0f} m @ {tm_time[max_alt_ind]/1000.0:.2f} s', ha='left', va='bottom', color='blue')
 ax1.set_xlabel('Time (ms)')
@@ -181,7 +202,7 @@ plt.legend()
 
 ax1 = plt.subplot(2, 1, 2)
 ax1.plot(tm_time, speed_baro, label='Barometer speed')
-ax1.plot(tm_time, speed_pitot, label='Pitot speed')
+ax1.plot(tm_time, speed_pitot, label='Pitot speed') 
 ax1.scatter(tm_time[max_speed_ind], speed_baro[max_speed_ind], marker='+', s=200)
 ax1.text(tm_time[max_speed_ind], speed_baro[max_speed_ind], f'Max speed: {speed_baro[max_speed_ind]:.2f} m/s @ {tm_time[max_speed_ind]/1000.0:.2f} s', ha='left', va='bottom', color='blue')
 ax1.set_xlabel('Time (ms)')

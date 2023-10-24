@@ -1,3 +1,11 @@
+###############################
+# Project       : MSE Avionics
+# Description   : Telemetrie data analysis
+# Licence       : CC BY-NC-SA 
+# Author        : Louis Barbier
+# https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+##############################
+
 import csv
 import matplotlib.pyplot as plt
 import numpy as np
@@ -84,11 +92,13 @@ max_speed_ind = speed_baro.index(max(speed_baro))
 pitot = list(map(lambda x : abs(int(x[11])),  raw_data))
 pitot = list(map(lambda x : a_pitot*(x**2) + b_pitot*x + c_pitot,  pitot)) # mBar
 # densite_air = (pression_atmospherique * masse_molaire_air) / (constante_gaz * temperature_air_kelvin)
-air_density = (pressure[0]*100 * 0.02896) / (8.314 * 293.15)
+# air_density = (pressure[0]*100 * 0.02896) / (8.314 * 293.15)
+air_density = list(map(lambda x : (x*100 * 0.02896) / (8.314 * 293.15), pressure))
 # Bernoulli => speed = sqrt((2 * dynamic pressure) / density)
 static_pressure_diff = pitot[0] - pressure[0]
 dynamic_pressure_pitot = list(map(lambda x,y : x-y-static_pressure_diff if (x-y-static_pressure_diff >= 0) else 0,  pitot, pressure)) # mBar
-speed_pitot = list(map(lambda x : math.sqrt((2 * x * 100) / air_density),  dynamic_pressure_pitot)) # m/s
+# speed_pitot = list(map(lambda x : math.sqrt((2 * x * 100) / air_density),  dynamic_pressure_pitot)) # m/s
+speed_pitot = list(map(lambda x, y : math.sqrt((2 * x * 100) / y),  dynamic_pressure_pitot, air_density)) # m/s
 
 ## GNSS extrapolation
 nb_gnss_point_touchdown = 20
@@ -112,13 +122,20 @@ lon_end.append(spline_lon(time_end[len(time_end)-1]+time_after_last_point))
 lat_end.append(spline_lat(time_end[len(time_end)-1]+time_after_last_point))
 alt_end.append(spline_alt(time_end[len(time_end)-1]+time_after_last_point))
 
+lon_meters_end = list(map(lambda x,y: x*40075*math.cos(y*math.pi/180)/360, lon_end, lat_end))
+lat_meters_end = list(map(lambda x: x*111.132954, lat_end))
+lon_meters_end = list(map(lambda x: (x-lon_meters_end[0])*1e3, lon_meters_end))
+lat_meters_end = list(map(lambda x: (x-lat_meters_end[0])*1e3, lat_meters_end))
+
+print(lon_end[-1])
+print(lat_end[-1])
 print(alt_end[len(alt_end)-1])
-### Export data
+### Export data altitude[iGnss]
 # GNSS data
 kml = simplekml.Kml()
 for iGnss in range(len(gnss_valid)):
     if (gnss_valid[iGnss] == 1):
-        kml.newpoint(name=str(iGnss), coords=[(longitude[iGnss], latitude[iGnss], altitude[iGnss])], altitudemode = simplekml.AltitudeMode.absolute)  # lon, lat, height
+        kml.newpoint(name=str(iGnss), coords=[(longitude[iGnss], latitude[iGnss], 430)], altitudemode = simplekml.AltitudeMode.absolute)  # lon, lat, height
 kml.save("output/mse_gps_points.kml")
 
 # Export GNSS extrapolated data
@@ -186,6 +203,7 @@ ax1.scatter(tm_time[max_speed_ind], speed_baro[max_speed_ind], marker='+', s=200
 ax1.text(tm_time[max_speed_ind], speed_baro[max_speed_ind], f'Max speed: {speed_baro[max_speed_ind]:.2f} m/s @ {tm_time[max_speed_ind]/1000.0:.2f} s', ha='left', va='bottom', color='blue')
 ax1.set_xlabel('Time (ms)')
 ax1.set_ylabel('m/s')
+ax1.set_title("Speed vs time")
 plot_rocket_states(ax1)
 plt.legend()
 
@@ -195,12 +213,12 @@ plt.tight_layout()
 fig_2 = plt.figure(figsize=(10, 8))
 ax = fig_2.add_subplot(111, projection='3d')
 
-ax.scatter(lon_end, lat_end, alt_end, c='red', marker='o', s=40, label='GNSS Points')
+ax.scatter(lon_meters_end, lat_meters_end, alt_end, c='red', marker='o', s=40, label='GNSS Points')
 ax.legend()
-ax.set_xlabel('Longitude')
-ax.set_ylabel('Latitude')
-ax.set_zlabel('Altitude')
+ax.set_xlabel('Distance in longitude axis [m]')
+ax.set_ylabel('Distance in latitude axis [m]')
+ax.set_zlabel('Altitude [m]')
 
-plt.suptitle('GNSS data', fontsize=16, fontweight='bold', color='blue')
+plt.suptitle('Derive in longitude/latitude axis from an altitude of '+str(alt_end[0])+' m', fontsize=16, fontweight='bold', color='blue')
 plt.tight_layout()
 plt.show()
